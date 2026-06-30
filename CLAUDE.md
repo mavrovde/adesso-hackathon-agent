@@ -4,6 +4,14 @@ This file teaches Claude Code how to work in this repository. It defines our dev
 
 ---
 
+## Task Tracking
+
+Offene Tasks werden in [`TODO.md`](TODO.md) gepflegt.
+
+> **Regel:** Setze Tasks auf `🔄 In Arbeit` wenn du anfängst, auf `✅ Fertig` wenn abgeschlossen. Tasks nie löschen — nur Status aktualisieren.
+
+---
+
 ## Project Overview
 
 **adesso-hackathon-agent** — An IT Helpdesk triage and intake agent built on the [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview).
