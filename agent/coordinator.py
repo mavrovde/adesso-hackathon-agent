@@ -693,6 +693,7 @@ def run_coordinator(request_text: str, user_id: str | None = None) -> dict:
         "priority": triage_result.priority,
         "confidence": triage_result.confidence,
         "escalated": triage_result.requires_human,
+        "hook_blocked": hook_blocked,
         "ticket_id": ticket_id,
         "action_taken": action_taken,
         "routing_target": triage_result.routing_target,
