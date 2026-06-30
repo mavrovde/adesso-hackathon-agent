@@ -305,16 +305,32 @@ def run_coordinator(request_text: str, user_id: str | None = None) -> dict:
             break
 
         if response.stop_reason == "end_turn":
-            # Last resort: try to extract JSON from text content
+            # Try to extract JSON from text as a last resort
             for block in response.content:
                 if hasattr(block, "text"):
                     try:
-                        # Try to find a JSON blob in the text
                         json_match = re.search(r"\{.*\}", block.text, re.DOTALL)
                         if json_match:
                             classify_input = json.loads(json_match.group())
                     except (json.JSONDecodeError, AttributeError):
                         pass
+
+            if classify_input is not None:
+                break
+
+            # Model stopped without calling classify_request — nudge it explicitly
+            if iteration < max_iterations - 1:
+                messages.append({"role": "assistant", "content": response.content})
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "You did not call classify_request. "
+                        "You MUST call classify_request now with your classification decision. "
+                        "Do not respond with text — call the tool."
+                    ),
+                })
+                continue
+
             break
 
         if response.stop_reason == "tool_use":
