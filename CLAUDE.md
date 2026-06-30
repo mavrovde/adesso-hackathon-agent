@@ -61,6 +61,7 @@ pytest
 │   ├── main.py            # Entry point, CLI parser, main loop
 │   ├── coordinator.py     # Coordinator agent (classification, enrichment, routing)
 │   ├── hooks.py           # PreToolUse permission hooks (hard blocks)
+│   ├── human_feedback.py  # Human override loop and feedback learning helpers
 │   ├── specialists/       # Stateless subagents
 │   │   ├── __init__.py
 │   │   ├── password_reset.py

@@ -4,7 +4,7 @@ import pytest
 
 from agent.tools.mock_store import reset_store, TICKETS
 from agent.tools.create_or_update_ticket import create_or_update_ticket
-from agent.overrides import override_agent_decision, get_few_shot_examples, OVERRIDES_FILE
+from agent.human_feedback import override_agent_decision, get_few_shot_examples, OVERRIDES_FILE
 
 
 @pytest.fixture(autouse=True)
