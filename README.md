@@ -84,17 +84,22 @@ export ANTHROPIC_API_KEY=your_key_here
 
 ---
 
-## Running the Agent
+## Running the Agent & Evals
+
+To ensure dependencies (like `pydantic` and `anthropic`) are correctly loaded, run commands using the virtual environment's python interpreter:
 
 ```bash
 # Run the coordinator with a sample request
-python -m agent.main --input "Sample inbound request text"
+PYTHONPATH=. .venv/bin/python3 -m agent.main --input "My laptop won't connect to WiFi since this morning."
 
-# Run against the full eval harness
-python -m eval.run
+# Run against the full eval harness (all suites)
+PYTHONPATH=. .venv/bin/python3 -m eval.run
 
 # Run only the adversarial eval set
-python -m eval.run --suite adversarial
+PYTHONPATH=. .venv/bin/python3 -m eval.run --suite adversarial
+
+# Run only the overrides eval set (capturing human corrections)
+PYTHONPATH=. .venv/bin/python3 -m eval.run --suite overrides
 ```
 
 ---
@@ -103,15 +108,34 @@ python -m eval.run --suite adversarial
 
 ```
 agent/
-  main.py          # entry point, coordinator agent loop
-  coordinator.py   # classification, enrichment, routing logic
-  specialists/     # one module per specialist subagent
-  tools/           # custom tool definitions
-  hooks.py         # PreToolUse permission hooks
+  main.py            # entry point, coordinator agent loop
+  coordinator.py     # classification, enrichment, routing logic
+  human_feedback.py  # Human overrides feedback collector and few-shot loader
+  specialists/       # one module per specialist subagent (stateless)
+  tools/             # custom tool definitions (mock database & KB lookup)
+  hooks.py           # PreToolUse permission hooks (deterministic guardrails)
 eval/
-  run.py           # eval harness
-  datasets/        # labeled request sets (normal + adversarial)
+  run.py             # eval harness (scorecard)
+  datasets/          # labeled request sets (normal, adversarial, overrides)
+demo.html            # Interactive Live Demo UI (employee portal + operator queue)
+presentation.html    # Glassmorphic pitch presentation slides
 ```
+
+---
+
+## Interactive UI & Slides
+
+- **Live Demo UI (`demo.html`):** Open this file directly in any browser. It provides an employee portal with pre-loaded scenarios to watch the agent classify and route, and an IT operator queue showing confidence bars, coordinator reasoning chains, and manual Approve / Override actions.
+- **Pitch Slides (`presentation.html`):** Open this file in your browser to view the self-contained 12-slide glassmorphic presentation covering our architecture, deterministic guardrails, evaluation scorecard, and live walk-throughs.
+
+---
+
+## Human Feedback Loop (Stretch Goal ✓)
+
+We closed the agent learning loop with a human-in-the-loop override mechanism:
+1. **Override Capture (`agent/human_feedback.py`):** When an operator overrides a ticket route, the overrider ID and justification are recorded onto the ticket audit log and saved to `eval/datasets/overrides.json`.
+2. **In-Context Few-Shot Learning:** The coordinator dynamically reads the latest overrides and injects them back into its prompt as custom few-shot exemplars, teaching the agent correct routing without model retraining.
+3. **Regression Prevention:** The overrides suite is run as part of the scorecard eval check to ensure the agent doesn't regress on human-corrected scenarios.
 
 ---
 
@@ -140,3 +164,4 @@ Runs in CI so the score moves as the agent changes and produces a defensible art
 ## License
 
 MIT
+

@@ -62,7 +62,7 @@ graph TD
 ```
 
 #### Loop Step Explanations:
-- **`stop_reason == "tool_use"`:** The coordinator intercepts the tool call. The `PreToolUse` hook (in [hooks.py](../../agent/hooks.py)) executes deterministic checks (e.g., PII extraction patterns, frozen accounts status). If blocked, it returns a block dictionary `{"block": True, "reason": "..."}` which triggers an immediate stop and escalation. If allowed, the tool is executed and results are returned to Claude.
+- **`stop_reason == "tool_use"`:** The coordinator intercepts the tool call. The `PreToolUse` hook (in [hooks.py](../../agent/hooks.py)) executes deterministic checks (e.g., checking for prompt injection keywords in any input, verifying that write actions are not performed on frozen/under-investigation accounts, and ensuring P1 tickets are not auto-resolved). If blocked, it returns a block dictionary `{"block": True, "reason": "..."}` which triggers an immediate stop and escalation. If allowed, the tool is executed and results are returned to Claude.
 - **`stop_reason == "max_tokens"`:** A safety stop that handles context inflation. Rather than failing, we log the truncation, prune or compress message history, and re-run.
 - **`stop_reason == "end_turn"`:** Represents model completion. We parse the structured output. If validation fails (e.g. invalid JSON, missing properties), we capture the validation error, insert it into the prompt, and retry (up to 3 times).
 
@@ -114,7 +114,13 @@ graph TB
       "account_status": "ACTIVE"
     },
     "relevant_kb_snippets": [
-      "SAP password reset procedure: call reset_user_password(user_id, 'sap')"
+      {
+        "id": "kb-001",
+        "title": "Password reset — SAP",
+        "body": "SAP password reset procedure: call reset_user_password(user_id, 'sap')",
+        "solution_type": "self_service",
+        "priority_hint": "P4"
+      }
     ]
   }
   ```
@@ -130,16 +136,17 @@ We split the specialists into two narrow domains to guarantee tool-selection rel
 - **Scope:** Auto-resolution of password reset tickets for verified, active users.
 - **Tools (4):**
   1. `get_user_context(user_id)`: (in [get_user_context.py](../../agent/tools/get_user_context.py)) Verifies role, account status, and history.
-  2. `lookup_kb(query)`: (in [lookup_kb.py](../../agent/tools/lookup_kb.py)) Finds system-specific reset runbooks.
+  2. `lookup_kb(query, category=None)`: (in [lookup_kb.py](../../agent/tools/lookup_kb.py)) Searches the internal IT knowledge base (30+ articles across 6 categories) by tag overlap and title match, returning matching runbooks along with `solution_type` and `priority_hint`.
   3. `reset_user_password(user_id, system)`: (in [reset_user_password.py](../../agent/tools/reset_user_password.py)) Performs the secure reset.
   4. `resolve_ticket(ticket_id, resolution_summary)`: (in [resolve_ticket.py](../../agent/tools/resolve_ticket.py)) Closes the ticket with an audit trail.
 
 #### B. IT Specialist Agent (`ITSpecialistAgent`)
 - **Location:** Implemented in [it_specialist.py](../../agent/specialists/it_specialist.py)
 - **Scope:** Processes hardware, software, network, access, and unknown category tickets. Resolves P3/P4 tickets with clear KB matches; escalates P1/P2 tickets.
+- **Immediate Escalation Keywords:** Any ticket containing security breach keywords (`"breach"`, `"ransomware"`, `"exfil"`, `"data leak"`, `"compromise"`) must bypass auto-actions and escalate immediately.
 - **Tools (5):**
   1. `get_user_context(user_id)`: (in [get_user_context.py](../../agent/tools/get_user_context.py)) Fetches user profile metadata.
-  2. `lookup_kb(query)`: (in [lookup_kb.py](../../agent/tools/lookup_kb.py)) Searches for known-error runbooks.
+  2. `lookup_kb(query, category=None)`: (in [lookup_kb.py](../../agent/tools/lookup_kb.py)) Searches the internal IT knowledge base (30+ articles across 6 categories) by tag overlap and title match, returning matching runbooks along with `solution_type` and `priority_hint`.
   3. `create_or_update_ticket(...)`: (in [create_or_update_ticket.py](../../agent/tools/create_or_update_ticket.py)) Enriches and writes classifications to the ticketing system.
   4. `resolve_ticket(ticket_id, resolution_summary)`: (in [resolve_ticket.py](../../agent/tools/resolve_ticket.py)) Closes the ticket.
   5. `escalate(ticket_id, reason, severity, impact)`: (in [escalate.py](../../agent/tools/escalate.py)) Triggers human handoff.
