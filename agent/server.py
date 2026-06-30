@@ -9,9 +9,12 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import pathlib
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
+
+_REPO_ROOT = pathlib.Path(__file__).parent.parent
 
 from agent.coordinator import run_coordinator
 from agent.tools.mock_store import USERS
@@ -47,8 +50,22 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header(k, v)
         self.end_headers()
 
+    def _send_html(self, path: pathlib.Path) -> None:
+        data = path.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_GET(self) -> None:
-        if self.path == "/users":
+        if self.path in ("/", "/demo", "/demo.html"):
+            html = _REPO_ROOT / "demo.html"
+            if html.exists():
+                self._send_html(html)
+            else:
+                self._send(404, {"error": "demo.html not found"})
+        elif self.path == "/users":
             users = [
                 {
                     "user_id": uid,
@@ -109,7 +126,7 @@ def main() -> None:
     args = parser.parse_args()
 
     server = ThreadedHTTPServer((args.host, args.port), Handler)
-    logger.info(f"Server listening on http://{args.host}:{args.port}")
+    logger.info(f"Server listening on http://{args.host}:{args.port}  →  Demo: http://{args.host}:{args.port}/")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
