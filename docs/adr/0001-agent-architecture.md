@@ -62,7 +62,7 @@ graph TD
 ```
 
 #### Loop Step Explanations:
-- **`stop_reason == "tool_use"`:** The coordinator intercepts the tool call. The `PreToolUse` hook (in [hooks.py](../../agent/hooks.py)) executes deterministic checks (e.g., PII extraction patterns, frozen accounts status). If blocked, it returns a block dictionary `{"block": True, "reason": "..."}` which triggers an immediate stop and escalation. If allowed, the tool is executed and results are returned to Claude.
+- **`stop_reason == "tool_use"`:** The coordinator intercepts the tool call. The `PreToolUse` hook (in [hooks.py](../../agent/hooks.py)) executes deterministic checks (e.g., checking for prompt injection keywords in any input, verifying that write actions are not performed on frozen/under-investigation accounts, and ensuring P1 tickets are not auto-resolved). If blocked, it returns a block dictionary `{"block": True, "reason": "..."}` which triggers an immediate stop and escalation. If allowed, the tool is executed and results are returned to Claude.
 - **`stop_reason == "max_tokens"`:** A safety stop that handles context inflation. Rather than failing, we log the truncation, prune or compress message history, and re-run.
 - **`stop_reason == "end_turn"`:** Represents model completion. We parse the structured output. If validation fails (e.g. invalid JSON, missing properties), we capture the validation error, insert it into the prompt, and retry (up to 3 times).
 
@@ -143,6 +143,7 @@ We split the specialists into two narrow domains to guarantee tool-selection rel
 #### B. IT Specialist Agent (`ITSpecialistAgent`)
 - **Location:** Implemented in [it_specialist.py](../../agent/specialists/it_specialist.py)
 - **Scope:** Processes hardware, software, network, access, and unknown category tickets. Resolves P3/P4 tickets with clear KB matches; escalates P1/P2 tickets.
+- **Immediate Escalation Keywords:** Any ticket containing security breach keywords (`"breach"`, `"ransomware"`, `"exfil"`, `"data leak"`, `"compromise"`) must bypass auto-actions and escalate immediately.
 - **Tools (5):**
   1. `get_user_context(user_id)`: (in [get_user_context.py](../../agent/tools/get_user_context.py)) Fetches user profile metadata.
   2. `lookup_kb(query, category=None)`: (in [lookup_kb.py](../../agent/tools/lookup_kb.py)) Searches the internal IT knowledge base (30+ articles across 6 categories) by tag overlap and title match, returning matching runbooks along with `solution_type` and `priority_hint`.
