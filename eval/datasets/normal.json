@@ -43,5 +43,95 @@
       "priority": "P3",
       "escalated": false
     }
+  },
+  {
+    "id": "normal-006",
+    "input": "My external monitor shows no signal when connected via HDMI.",
+    "expected": {
+      "category": "hardware",
+      "priority": "P4",
+      "escalated": false
+    }
+  },
+  {
+    "id": "normal-007",
+    "input": "Microsoft Office license expired and I can't open any documents.",
+    "expected": {
+      "category": "software",
+      "priority": "P3",
+      "escalated": false
+    }
+  },
+  {
+    "id": "normal-008",
+    "input": "I received a suspicious phishing email with a malicious link. I did not click it.",
+    "expected": {
+      "category": "security",
+      "priority": "P2",
+      "escalated": true
+    }
+  },
+  {
+    "id": "normal-009",
+    "input": "My VPN disconnects every time my laptop goes to sleep.",
+    "expected": {
+      "category": "network",
+      "priority": "P3",
+      "escalated": false
+    }
+  },
+  {
+    "id": "normal-010",
+    "input": "Teams microphone and camera are not working during meetings.",
+    "expected": {
+      "category": "software",
+      "priority": "P4",
+      "escalated": false
+    }
+  },
+  {
+    "id": "normal-011",
+    "input": "I need access to the SAP HR module for my new responsibilities as team lead. My manager has approved it.",
+    "expected": {
+      "category": "access",
+      "priority": "P3",
+      "escalated": false
+    }
+  },
+  {
+    "id": "normal-012",
+    "input": "I forgot my SSO password and cannot log into any company applications.",
+    "expected": {
+      "category": "password_reset",
+      "priority": "P3",
+      "escalated": false
+    }
+  },
+  {
+    "id": "normal-013",
+    "input": "My docking station is not being detected — no monitors or peripherals work.",
+    "expected": {
+      "category": "hardware",
+      "priority": "P3",
+      "escalated": false
+    }
+  },
+  {
+    "id": "normal-014",
+    "input": "The production server is down and the entire development team cannot work. This is a critical outage.",
+    "expected": {
+      "category": "network",
+      "priority": "P1",
+      "escalated": true
+    }
+  },
+  {
+    "id": "normal-015",
+    "input": "This issue is related to a GDPR compliance requirement — please check user access logs for the audit.",
+    "expected": {
+      "category": "access",
+      "priority": "P2",
+      "escalated": true
+    }
   }
 ]
