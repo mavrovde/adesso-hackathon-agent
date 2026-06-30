@@ -1,112 +1,220 @@
 # CLAUDE.md
 
-This file teaches Claude Code how to work in this repository.
+This file teaches Claude Code how to work in this repository. It defines our development workflows, Python best practices, and Claude Agent SDK integration patterns.
 
-## Project
+---
 
-**adesso-hackathon-agent** — IT Helpdesk triage agent built on the Claude Agent SDK.
-Hackathon Scenario 5: "The Intake". Inbound IT requests are classified, enriched, and routed autonomously. Routine cases (e.g. password resets) are auto-resolved; high-risk actions require human approval.
+## Project Overview
 
-See `TASK.md` for the full scenario description.
+**adesso-hackathon-agent** — An IT Helpdesk triage and intake agent built on the [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk/overview).
+It automates classification, context enrichment, queue routing, and password-reset auto-resolution, while applying deterministic security hooks (`PreToolUse`) and explicit business escalation rules for human-in-the-loop validation.
 
-## Setup
+---
 
+## Setup and Run
+
+### Environment Setup
 ```bash
+# Create and activate virtual environment
 python -m venv .venv
 source .venv/bin/activate
+
+# Install dependencies (pinned versions)
 pip install -r requirements.txt
+# (Optional) Install development dependencies if separate
+# pip install -r requirements-dev.txt
+
+# Set Anthropic API Key
 export ANTHROPIC_API_KEY=your_key_here
 ```
 
-## Run
-
+### Execution Commands
 ```bash
-# Single request
+# Run the coordinator agent with a single input
 python -m agent.main --input "My laptop won't connect to WiFi"
 
-# Full eval harness
+# Run the full evaluation harness
 python -m eval.run
 
-# Adversarial eval only
+# Run only the adversarial evaluation suite
 python -m eval.run --suite adversarial
+
+# Run code style, linting, and type checking (suggested)
+ruff check .
+ruff format .
+mypy --strict .
+pytest
 ```
 
-## Architecture
-
-```
-Inbound request (text)
-        │
-        ▼
-┌─────────────────────┐
-│  Coordinator Agent  │  classify · enrich · route
-│                     │  validation-retry loop (max 3 retries)
-└──────────┬──────────┘
-           │  explicit context in Task prompt
-     ┌─────┴──────┐
-     ▼            ▼
-┌──────────┐  ┌──────────────┐
-│ Password │  │ IT Specialist│
-│  Reset   │  │    Agent     │
-│  Agent   │  └──────────────┘
-└──────────┘
-     │
-     ▼
-PreToolUse hook → hard block on high-risk patterns
-     │
-     ▼
-Human-in-the-loop (escalation rules)
-```
-
-**Key rules:**
-- Specialist subagents do NOT inherit coordinator context — pass everything needed in the Task prompt
-- Max 4–5 tools per specialist (tool-selection reliability drops past that)
-- All tool errors return `{"isError": true, "reason": "...", "guidance": "..."}` — never raw strings
-- Escalation rules are explicit: `category + confidence < threshold + dollar_impact` — never vague
+---
 
 ## Project Structure
 
 ```
-agent/
-  main.py           # entry point, coordinator loop
-  coordinator.py    # classification, enrichment, routing + validation-retry
-  specialists/
-    password_reset.py
-    it_specialist.py
-  tools/            # one file per tool
-  hooks.py          # PreToolUse hard blocks
-eval/
-  run.py            # eval harness
-  datasets/
-    normal.json     # labeled normal traffic
-    adversarial.json # prompt injection, ambiguous urgency, hidden exposure
+.
+├── CLAUDE.md              # Claude Code workspace guidelines (this file)
+├── MANDATE.md             # PM/BA Mandate defining agent authority & boundaries
+├── PLAN.md                # IT Helpdesk Agent implementation plan
+├── README.md              # Project setup, execution, and architecture overview
+├── TASK.md                # Original hackathon scenario description
+├── agent/
+│   ├── main.py            # Entry point, CLI parser, main loop
+│   ├── coordinator.py     # Coordinator agent (classification, enrichment, routing)
+│   ├── hooks.py           # PreToolUse permission hooks (hard blocks)
+│   ├── specialists/       # Stateless subagents
+│   │   ├── __init__.py
+│   │   ├── password_reset.py
+│   │   └── it_specialist.py
+│   └── tools/             # Specialist custom tools
+│       ├── __init__.py
+│       ├── access.py
+│       ├── kb.py
+│       └── ticket.py
+└── eval/
+    ├── run.py             # Evaluation harness
+    └── datasets/
+        ├── normal.json    # Labeled normal traffic dataset
+        └── adversarial.json # Labeled prompt injection / edge cases dataset
 ```
 
-## Conventions
+---
 
-- **Structured output always**: coordinator returns typed dicts, never free text
-- **Log reasoning chains**: every routing decision must be replayable from the log alone — log `category`, `confidence`, `routing`, `reasoning`, `requires_human`, `retry_count`
-- **Explicit escalation rules** (not "when unsure"):
-  - `category in ["legal", "compliance", "vip"]` → escalate
-  - `confidence < 0.75` → escalate
-  - `dollar_impact > 10_000` → escalate
-- **PreToolUse hard blocks**: `frozen_account + write_action`, `pii_detected in route_target`, `known_bad_route`
-- No mocking in tests — use the real SDK with a test API key
+## Claude Agent SDK & Architecture Best Practices
 
-## Hackathon Deliverables
+All development relating to the Claude Agent SDK must adhere to the following architectural guidelines:
 
-Three files matter for judging:
-1. `README.md` — what was built and how to run it
-2. `CLAUDE.md` — how the team taught Claude to work their way (this file)
-3. `presentation.html` — the demo story
+### 1. Agent Loop & `stop_reason` Handling
+- Do not let the SDK handle loop execution blindly. Always handle `stop_reason` explicitly in custom loops:
+  - `stop_reason == "tool_use"`: Resolve the tool call via local dispatcher, feed the output back to the model, and continue.
+  - `stop_reason == "end_turn"`: The model has finished its reasoning. Capture the output, parse the decision, log, and exit.
+  - `stop_reason == "max_tokens"`: Log a truncation warning, notify the user, and truncate context or retry with a compressed history.
 
-Commit history is evidence — commit often, with meaningful messages.
+### 2. Coordinator & Specialist Handoff
+- **Context Isolation:** Specialist subagents (e.g., `PasswordResetAgent`, `ITSpecialistAgent`) are stateless and **do not** inherit the coordinator's prompt context.
+- **Explicit Prompt Handoff:** All required information must be explicitly passed to the subagent via the `Task` prompt, including:
+  - Original request text.
+  - Prioritized category and urgency (P1–P4).
+  - User context (role, department, status, VIP status).
+  - Pre-fetched knowledge base (KB) snippets.
+  - Ticketing metadata (ticket ID).
 
-## Domain: IT Helpdesk
+### 3. Custom Tool Design
+- **Tool Discipline:** Restrict each specialist agent to **4 to 5 tools** max. Tool selection accuracy drops significantly when the tool space is bloated.
+- **Systematic Tool Descriptions:** Every tool definition must include a detailed docstring specifying:
+  - Clear parameters and types.
+  - What the tool does and, critically, **what it does NOT do**.
+  - Expected inputs and edge cases.
+  - Typical query examples.
+- **Structured Error Responses:** Tools must **never** raise unhandled exceptions or return raw strings to the agent on failure. They must return a structured payload for Claude to recover:
+  ```python
+  # Success
+  {"ok": True, "data": {...}}
+  # Failure
+  {"ok": False, "isError": True, "code": "USER_NOT_FOUND", "guidance": "Verify user ID and try again."}
+  ```
 
-**Categories:** `password_reset` · `network` · `software` · `hardware` · `access` · `vip_escalation` · `unknown`
+### 4. Validation-Retry Loop
+- Wrap the coordinator's structured JSON/Pydantic output parsing in a retry loop.
+- If parsing or validation fails (e.g. `pydantic.ValidationError`), capture the specific validation error details and feed them back into the next model turn.
+- Limit retries to `MAX_RETRIES = 3`. If the model fails 3 times, escalate to a human.
+- Log retry counts and validation error types per request.
 
-**Priority levels:** P1 (critical/outage) · P2 (major) · P3 (minor) · P4 (routine)
+### 5. Deterministic Guardrails ("The Brake")
+- **Deterministic Hard Blocks (`PreToolUse` Hook):**
+  - Implement deterministic hooks that execute **before** Claude calls a tool. Do not rely on model-driven system prompts for safety.
+  - Prohibit actions on frozen or investigated accounts (e.g. `reset_user_password` where status is `FROZEN` or `UNDER_INVESTIGATION`).
+  - Prohibit any write actions on critical issues (e.g. `resolve_ticket` on P1 issues).
+  - Prohibit any tool call containing suspected prompt-injection vectors or exfiltration patterns (PII leakage).
+- **Explicit Escalation Rules (Human-in-the-Loop):**
+  - Route to human when confidence threshold < `0.75`.
+  - Route to human when user is a VIP (C-Level/Board or whitelisted).
+  - Route to human when request body mentions legal/compliance terms (Datenschutz, GDPR, lawsuit).
+  - Route to human when estimated business impact > €10,000.
+  - Route to human on priority P1/P2 incidents for any writing tools.
 
-**Auto-resolve:** password resets where account is active and not flagged
+### 6. Human Feedback Loop
+- When a human overrides the agent, capture the override decision.
+- Save the override as a labeled example to feed back into the eval dataset or to use as few-shot prompt examples for the classifier.
 
-**Always escalate:** VIP users, legal/compliance mentions, confidence < 0.75, any write action on a flagged account
+---
+
+## Python Best Practices
+
+Follow these standard coding and design patterns across the codebase:
+
+### Style, Formatting, and Linting
+- **Python Version:** Target **Python 3.11+**.
+- **Code Style:** Max line length is **100 characters**.
+- **Linter & Formatter:** Use **`ruff`** for formatting and linting. Run `ruff check .` and `ruff format .` before committing.
+- **Naming Conventions:**
+  - `snake_case` for variables, functions, and modules.
+  - `PascalCase` for classes and Pydantic models.
+  - `UPPER_SNAKE_CASE` for global/module constants.
+- **Robust Syntax:**
+  - Prefer f-strings for string interpolation.
+  - No bare `except:`. Always catch specific exceptions (e.g., `except ValueError:`).
+  - Never use mutable default arguments (`def f(x=[]):`). Use `x: list | None = None` and initialize inside the function.
+
+### Type Annotations
+- Use `from __future__ import annotations` at the top of every python file.
+- Annotate all function parameters and return types. Avoid the `Any` type.
+- Use Python 3.10+ native union syntax (`X | None` instead of `Optional[X]`).
+- Use `TypedDict` or `pydantic.BaseModel` for structured data crossing module boundaries (no raw `dict` structures for complex data structures).
+- Run `mypy --strict .` to verify type safety.
+
+### Imports
+- Organize imports in three groups: stdlib, third-party libraries, and local packages, separated by blank lines.
+- Use absolute imports (e.g., `from agent.tools.kb import search_kb`).
+- Never use wildcard imports (`from module import *`).
+
+### Logging and PII Security
+- Use structured logging (JSON format) via `logging.getLogger(__name__)`.
+- **No Production Prints:** Do not use `print()` in core production paths.
+- **PII Scrubbing:** Ensure all logs are scrubbed of PII (emails, names, passwords) before writing.
+- **Decision Traceability:** Log fields per routing decision: `request_id`, `channel`, `category`, `confidence`, `routing_target`, `retry_count`, `error_type`, `escalated`, `hook_blocked`.
+
+### Asynchronous Programming
+- Use `async` and `await` throughout.
+- Avoid calling `asyncio.run()` in places with active event loops.
+- Set explicit, non-blocking timeouts (e.g., using `asyncio.wait_for`) on all network, API, or system-of-record requests.
+
+### Testing
+- Use `pytest` and `pytest-asyncio` for unit and integration testing.
+- Do not mock the Claude API in integration tests; use a valid test environment `ANTHROPIC_API_KEY`.
+- Mock external ticketing systems and system-of-record APIs using mock objects or in-memory dicts.
+- Write tests for every custom tool covering:
+  - The happy path.
+  - The structured-error path.
+  - Edge cases and invalid inputs.
+
+---
+
+## Domain & Incident Conventions (IT Helpdesk)
+
+Ensure these constants and conventions are respected:
+
+- **Incident Categories:** `password_reset`, `network`, `software`, `hardware`, `access`, `vip_escalation`, `unknown`.
+- **Priority Levels:**
+  - `P1`: Critical / Outage (Always escalates write tools).
+  - `P2`: Major (Escalates major write/resolve tools).
+  - `P3`: Minor (Can be resolved via IncidentSpecialist with KB match).
+  - `P4`: Routine (Auto-resolution candidate).
+- **Auto-Resolution Candidates:** Only `password_reset` category on active, unflagged accounts via SSO channels.
+- **Escalation Triggers:**
+  - Confidence score < `0.75`
+  - Language is not English or German.
+  - VIP Role or VIP whitelist.
+  - High dollar impact (> €10,000).
+  - Legal or compliance mentions (e.g. GDPR, Datenschutz).
+
+---
+
+## Evaluation Scorecard Metrics
+
+Our CI-based eval harness calculates the following metrics over a stratified sample of normal (`eval/datasets/normal.json`) and adversarial (`eval/datasets/adversarial.json`) data:
+
+1. **Accuracy:** Overall percentage of correct triage decisions.
+2. **Precision per Category:** Class-specific routing correctness.
+3. **Escalation Rate:** Ratio of correct escalations vs. unnecessary escalations.
+4. **Adversarial-Pass Rate:** Resistance to prompt injection and hidden legal exposures.
+5. **False-Confidence Rate:** Percentage of decisions where the agent is confidently wrong (confidence ≥ 0.75 but incorrect).
