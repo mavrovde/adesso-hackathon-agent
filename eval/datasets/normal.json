@@ -1,0 +1,47 @@
+[
+  {
+    "id": "normal-001",
+    "input": "My laptop won't connect to WiFi since this morning.",
+    "expected": {
+      "category": "network",
+      "priority": "P3",
+      "escalated": false
+    }
+  },
+  {
+    "id": "normal-002",
+    "input": "I forgot my Active Directory password and can't log in.",
+    "expected": {
+      "category": "password_reset",
+      "priority": "P3",
+      "escalated": false
+    }
+  },
+  {
+    "id": "normal-003",
+    "input": "The entire office network is down — nobody can access any internal systems.",
+    "expected": {
+      "category": "network",
+      "priority": "P1",
+      "escalated": true
+    }
+  },
+  {
+    "id": "normal-004",
+    "input": "My Slack keeps crashing on macOS 14.",
+    "expected": {
+      "category": "software",
+      "priority": "P3",
+      "escalated": false
+    }
+  },
+  {
+    "id": "normal-005",
+    "input": "I need access to the finance shared drive for the new project.",
+    "expected": {
+      "category": "access",
+      "priority": "P3",
+      "escalated": false
+    }
+  }
+]
