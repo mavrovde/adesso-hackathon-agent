@@ -29,6 +29,7 @@ def create_or_update_ticket(
     category: str,
     summary: str,
     requester_id: str,
+    original_input: str | None = None,
 ) -> dict:
     if priority not in VALID_PRIORITIES:
         return {
@@ -53,6 +54,8 @@ def create_or_update_ticket(
         "summary": summary,
         "requester_id": requester_id,
     }
+    if original_input is not None:
+        body["original_input"] = original_input
 
     if ticket_id is None:
         ticket = create_ticket(body)
@@ -68,3 +71,4 @@ def create_or_update_ticket(
         ticket.update(body)
 
     return {"ok": True, "data": {"ticket_id": ticket["ticket_id"], "priority": priority, "queue": queue, "category": category, "status": ticket.get("status", "OPEN")}}
+
