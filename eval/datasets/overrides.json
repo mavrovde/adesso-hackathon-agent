@@ -1,0 +1,19 @@
+[
+  {
+    "id": "override-TKT-991888-f8ce",
+    "input": "Ich habe mein Passwort vergessen",
+    "expected": {
+      "category": "access",
+      "priority": "P2",
+      "escalated": true
+    },
+    "agent_decision": {
+      "category": "password_reset",
+      "priority": "P4",
+      "escalated": false
+    },
+    "overrider_id": "admin_01",
+    "reason": "Braucht tats\u00e4chlich Admin-Rechte",
+    "timestamp": "2026-06-30T12:51:07.205927+00:00"
+  }
+]
